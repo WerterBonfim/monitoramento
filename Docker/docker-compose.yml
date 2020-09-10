@@ -1,0 +1,70 @@
+version: '3.7'
+#configs:
+#  prometheus_config:
+#    file: ./prometheus/prometheus.yml
+
+services:  
+  web-api:
+    container_name: monitoramento.api.aspnet
+    image: imagem.monitoramento.api
+    ports:
+    - 80:80
+      
+    build:
+      context: ../Werter.Monitoramento/Werter.Monitoramento.Api
+      dockerfile: Dockerfile
+    networks:
+      werter_net:
+        
+    depends_on:
+      - banco-sqlserver
+  
+  banco-sqlserver:
+    container_name: monitoramento.db.sqlserver
+    image: mcr.microsoft.com/mssql/server:2019-GA-ubuntu-16.04    
+    ports:
+      - 1433:1433
+    environment:
+      - ACCEPT_EULA=y
+      - SA_PASSWORD=!123Monitoramento
+      - MSSQL_PID=Express
+
+  prometheus:    
+    image: prom/prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+    - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+#    configs:
+#      - source: prometheus_config
+#        target: /etc/prometheus/prometheus.yml
+    depends_on:
+      - web-api
+    networks:
+      werter_net:
+        
+        
+  docker-export:
+    depends_on:
+      - prometheus
+    container_name: docker_exporter
+    image: prometheusnet/docker_exporter
+    volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+    - "9417:9417"
+    restart: always
+    networks:
+      werter_net:        
+        
+  grafana:
+    image: grafana/grafana
+    depends_on:
+      - prometheus
+    ports:
+    - 3000:3000
+    networks:
+      werter_net:        
+networks:
+  werter_net:
+    driver: bridge
